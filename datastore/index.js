@@ -2,10 +2,12 @@ const fs = require('fs');
 const path = require('path');
 const _ = require('underscore');
 const counter = require('./counter');
+const Promise = require('bluebird');
 
 var items = {};
 
 // Public API - Fix these CRUD functions ///////////////////////////////////////
+Promise.promisifyAll(fs);
 
 exports.create = (text, callback) => {
   var id = counter.getNextUniqueId((err, id) => {
@@ -27,12 +29,28 @@ exports.readAll = (callback) => {
   // });
   // callback(null, data);
   // { id: id, text: text }
-  fs.readdir(exports.dataDir, (err, files) => {
-    let results = files.map((file) => { return {id: file.slice(0, 5), text: file.slice(0, 5)}; });
-    callback(null, results);
-  });
+  // fs.readdir(exports.dataDir, (err, files) => {
+  //   let results = files.map((file) => { return {id: file.slice(0, 5), text: file.slice(0, 5)}; });
+  //   callback(null, results);
+  // });
 
   //get a list of all the file names, map over each file name, maybe create an object with two properties: id and 'text' (which is set to the id rather than the actual contents of the file)
+
+  //promisify fs, which will make async versions of fs methods available
+  //start with readdirAsync. get array returned from readdirAsync
+  return fs.readdirAsync(exports.dataDir).then((files)=> {
+    return files.map((fileName) => {
+      let id = fileName.slice(0, 5);
+      return fs.readFileAsync(`${exports.dataDir}/${id}.txt`, 'utf8').then((content) => {
+        let object = { id: id, text: content };
+        return object;
+      });
+    });
+  }).then((array) => {
+    return Promise.all(array).then((results) => { console.log('results', results); callback(null, results); });
+  });
+
+  //call Promise.all([array]).then(()=>{[push object to results array]})
 };
 
 exports.readOne = (id, callback) => {
